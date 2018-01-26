@@ -75,14 +75,13 @@ void Convert::processScan(const pandar_msgs::PandarScan::ConstPtr &scanMsg)
     // {
     //     data_->unpack(scanMsg->packets[i], *outMsg);
     // }
-    double firstStamp = 0.0f;
+    double firstStamp = 0.0001f;  //TODO
     int ret = data_->unpack(scanMsg, *outMsg , gps1 , gps2 , firstStamp);
-
-
 
     // publish the accumulated cloud message
 	ROS_DEBUG_STREAM("Publishing " << outMsg->height * outMsg->width
 					 << " Pandar40 points, time: " << outMsg->header.stamp);
+
 
     if(ret == 1)
     {
