@@ -23,7 +23,7 @@ namespace pandar_pointcloud
 {
 /** @brief Constructor. */
 Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh):
-    data_(new pandar_rawdata::RawData()), drv(node , private_nh , this)
+    data_(new pandar_rawdata::RawData())
 {
     data_->setup(private_nh);
 
@@ -36,35 +36,16 @@ Convert::Convert(ros::NodeHandle node, ros::NodeHandle private_nh):
     CallbackType f;
     f = boost::bind (&Convert::callback, this, _1, _2);
     srv_->setCallback (f);
+    
     double start_angle;
     private_nh.param("start_angle", start_angle, 0.0);
     lidarRotationStartAngle = int(start_angle * 100);
-
-    hasGps = 0;
-    // subscribe to PandarScan packets
-    // pandar_scan_ =
-    //     node.subscribe("pandar_packets", 100,
-    //                    &Convert::processScan, (Convert *) this,
-    //                    ros::TransportHints().tcpNoDelay(true));
-    // pandar_gps_ =
-    //     node.subscribe("pandar_gps", 1,
-    //                    &Convert::processGps, (Convert *) this,
-    //                    ros::TransportHints().tcpNoDelay(true));
-
-    sem_init(&picsem, 0, 0);
-    pthread_mutex_init(&piclock, NULL);
-
-    boost::thread thrd(boost::bind(&Convert::DriverReadThread, this));
-    boost::thread processThr(boost::bind(&Convert::processLiDARData, this));
+    pandar_scan_ =
+         node.subscribe("pandar_packets", 100,
+                        &Convert::processScan, (Convert *) this,
+                        ros::TransportHints().tcpNoDelay(true));
 }
 
-void Convert::DriverReadThread()
-{
-    while(1)
-    {
-        drv.poll();
-    }
-}
 
 void Convert::callback(pandar_pointcloud::CloudNodeConfig &config,
                        uint32_t level)
@@ -89,11 +70,7 @@ void Convert::processScan(const pandar_msgs::PandarScan::ConstPtr &scanMsg)
     outMsg->header.frame_id = scanMsg->header.frame_id;
     outMsg->height = 1;
 
-    // process each packet provided by the driver
-    // for (size_t i = 0; i < scanMsg->packets.size(); ++i)
-    // {
-    //     data_->unpack(scanMsg->packets[i], *outMsg);
-    // }
+    //process each packet provided by the driver
     double firstStamp = 0.0f;
     int ret = data_->unpack(scanMsg, *outMsg , gps1 , gps2 , firstStamp, lidarRotationStartAngle);
 
@@ -108,124 +85,5 @@ void Convert::processScan(const pandar_msgs::PandarScan::ConstPtr &scanMsg)
     }
 }
 
-void Convert::processGps(pandar_msgs::PandarGps &gpsMsg)
-{
-
-    struct tm t;
-    t.tm_sec = gpsMsg.second;
-    t.tm_min = gpsMsg.minute;
-    t.tm_hour = gpsMsg.hour;
-    t.tm_mday = gpsMsg.day;
-    t.tm_mon = gpsMsg.month - 1;
-    t.tm_year = gpsMsg.year + 2000 - 1900;
-    t.tm_isdst = 0;
-    if(lastGPSSecond != (mktime(&t) + 1))
-    {
-        lastGPSSecond = (mktime(&t) + 1);
-        gps2.gps = mktime(&t) + 1; // the gps always is the last gps, the newest GPS data is after the PPS(Serial port transmition speed...)
-        gps2.used = 0;
-    }
-     // ROS_ERROR("Got a gps data %d " ,gps2.gps);
-}
-
-void Convert::pushLiDARData(pandar_msgs::PandarPacket packet)
-{
-    pthread_mutex_lock(&piclock);
-    LiDARDataSet.push_back(packet);
-    if(LiDARDataSet.size() > 6)
-    {
-        sem_post(&picsem);
-    }
-    pthread_mutex_unlock(&piclock);
-
-}
-
-int Convert::processLiDARData()
-{
-    double lastTimestamp = 0.0f;
-    pandar_rawdata::PPointCloud::Ptr outMsg(new pandar_rawdata::PPointCloud());
-    int frame_id = 0;
-    struct timespec ts;
-    while(1)
-    {
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-        {
-            ROS_ERROR("get time error");
-        }
-
-        ts.tv_sec += 1;
-        if (sem_timedwait(&picsem, &ts) == -1)
-        {
-            // ROS_INFO("No Pic");
-            continue;
-        }
-        pthread_mutex_lock(&piclock);
-        pandar_msgs::PandarPacket packet = LiDARDataSet.front();
-        LiDARDataSet.pop_front();
-        pthread_mutex_unlock(&piclock);
-
-        if (output_.getNumSubscribers() == 0)         // no one listening?
-                continue;                                     // avoid much work
-
-        // outMsg's header is a pcl::PCLHeader, convert it before stamp assignment
-        // pcl_conversions::toPCL(ros::Time::now(), outMsg->header.stamp);
-        // outMsg->is_dense = false;
-        outMsg->header.frame_id = "pandar";
-        outMsg->height = 1;
-
-
-
-        double firstStamp = 0.0f;
-        int ret = data_->unpack(packet, *outMsg , gps1 , gps2 , firstStamp, lidarRotationStartAngle);
-
-
-
-        if(ret == 1)
-        {
-            // ROS_ERROR("timestamp : %f " , firstStamp);
-            if(lastTimestamp != 0.0f)
-            {
-                if(lastTimestamp > firstStamp)
-                {
-                    ROS_ERROR("errrrrrrrrr");
-                }
-            }
-
-            lastTimestamp = firstStamp;
-            if(hasGps)
-            {
-              pcl_conversions::toPCL(ros::Time(firstStamp), outMsg->header.stamp);
-            }
-            else
-            {
-              pcl_conversions::toPCL(ros::Time::now(), outMsg->header.stamp);
-            }
-            output_.publish(outMsg);
-            outMsg->clear();
-
-
-        }
-    }
-}
-
-void Convert::processGps(const pandar_msgs::PandarGps::ConstPtr &gpsMsg)
-{
-    hasGps = 1;
-    struct tm t;
-    t.tm_sec = gpsMsg->second;
-    t.tm_min = gpsMsg->minute;
-    t.tm_hour = gpsMsg->hour;
-    t.tm_mday = gpsMsg->day;
-    t.tm_mon = gpsMsg->month - 1;
-    t.tm_year = gpsMsg->year + 2000 - 1900;
-    t.tm_isdst = 0;
-    if(lastGPSSecond != (mktime(&t) + 1))
-    {
-        lastGPSSecond = (mktime(&t) + 1);
-        gps2.gps = mktime(&t) + 1; // the gps always is the last gps, the newest GPS data is after the PPS(Serial port transmition speed...)
-        gps2.used = 0;
-    }
-    // ROS_ERROR("Got data second : %f " ,(double)gps2.gps);
-}
 
 } // namespace pandar_pointcloud

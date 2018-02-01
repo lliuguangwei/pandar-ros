@@ -28,7 +28,6 @@
 #include <pandar_pointcloud/CloudNodeConfig.h>
 #include <boost/lockfree/queue.hpp>
 #include <boost/atomic.hpp>
-#include "driver.h"
 #include <pandar_msgs/PandarPacket.h>
 
 namespace pandar_pointcloud
@@ -40,11 +39,6 @@ public:
     Convert(ros::NodeHandle node, ros::NodeHandle private_nh);
     ~Convert() {}
 
-    void DriverReadThread();
-    void processGps(pandar_msgs::PandarGps &gpsMsg);
-    void pushLiDARData(pandar_msgs::PandarPacket packet);
-
-    int processLiDARData();
 
 private:
 
@@ -74,12 +68,8 @@ private:
     pandar_rawdata::gps_struct_t gps2;
     bool hasGps;
 
-    unsigned int lastGPSSecond;
+
     int lidarRotationStartAngle;
-
-    pandar_pointcloud::PandarDriver drv;
-
-    pthread_mutex_t piclock;
     sem_t picsem;
     std::list<pandar_msgs::PandarPacket> LiDARDataSet;
 };

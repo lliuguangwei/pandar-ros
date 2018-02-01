@@ -193,7 +193,6 @@ bool PandarDriver::poll(void)
                 ROS_ERROR("Ignore wrong GPS data (year)%d" , gps->year);
                 continue;
               }
-              convert->processGps(*gps);
               gpsoutput_.publish(gps);
             }
             
@@ -201,7 +200,6 @@ bool PandarDriver::poll(void)
           if (rc < 0) return false; // end of file reached?
         }
 
-        convert->pushLiDARData(scan->packets[i]);
     }
 
   // publish message using time of last packet read
