@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string>
+#include <vector>
 #include <boost/format.hpp>
 #include <math.h>
 
@@ -33,6 +34,7 @@
 #include <pandar_msgs/PandarScan.h>
 #include <pandar_pointcloud/point_types.h>
 #include <pandar_pointcloud/calibration.h>
+#include <lidar_utils/pointxyzdata.h>
 
 namespace pandar_rawdata
 {
@@ -117,6 +119,7 @@ public:
 
     void unpack(const pandar_msgs::PandarPacket &pkt, PPointCloud &pc);
     int unpack(const pandar_msgs::PandarScan::ConstPtr &scanMsg, PPointCloud &pc);
+    int unpack(const pandar_msgs::PandarScan &scanMsg, pcl::PointCloud<PointXYZData> &pc);
 
     void setParameters(double min_range, double max_range, double view_direction,
                        double view_width);
@@ -154,6 +157,10 @@ private:
 	void toPointClouds (raw_packet* packet, PPointCloud& pc);
     void toPointClouds (raw_packet_t* packet,int laser ,  PPointCloud& pc);
     void toPointClouds (raw_packet_t* packet,int laser , int block,  PPointCloud& pc);
+
+    void toPointClouds (raw_packet* packet, float time_correction_in_msg, pcl::PointCloud<PointXYZData>& pc);
+    void toPointClouds (raw_packet_t* packet,int laser, float time_correction_in_msg, pcl::PointCloud<PointXYZData>& pc);
+    void toPointClouds (raw_packet_t* packet,int laser, int block, float time_correction_in_msg, pcl::PointCloud<PointXYZData>& pc);
 	void computeXYZIR(PPoint& point, int azimuth,
 			const raw_measure_t& laserReturn,
 			const pandar_pointcloud::PandarLaserCorrection& correction);
