@@ -486,7 +486,6 @@ namespace pandar_rawdata
                 }
             }
         }
-
         if(hasAframe)
         {
             for(int i = 0 ; i < LASER_COUNT ; i++)
@@ -704,281 +703,133 @@ namespace pandar_rawdata
 #endif
     }
 
+    
+    // int RawData::unpack(const pandar_msgs::PandarScan &scanMsg, pcl::PointCloud<PointXYZData> &pc)
+    // {
+    //     // bufferPacketSize = 0;
+    //     currentPacketStart = bufferPacketSize == 0 ? 0 :bufferPacketSize -1; // original
+    //     std::vector<float> time_corrections;
+    //     for (int i = 0; i < scanMsg.packets.size(); ++i)
+    //     {
+    //         /* code */
+    //         parseRawData(&bufferPacket[bufferPacketSize++], &scanMsg.packets[i].data[0], scanMsg.packets[i].data.size());
+
+    //         // calculate time correction
+    //         float time_correction_in_msg = float(i)/float(scanMsg.packets.size());
+    //         time_corrections.push_back(time_correction_in_msg);
+    //     }
+
+    //     // ROS_ERROR("currentPacketStart %d bufferPacketSize %d " , currentPacketStart , bufferPacketSize);
+    //     int hasAframe = 0;
+    //     int currentBlockEnd = 0;
+    //     int currentPacketEnd = 0;
+    //     if(bufferPacketSize > 1)
+    //     {
+    //         int lastAzumith = -1;
+    //         for(int i = currentPacketStart ; i < bufferPacketSize ; i++)
+    //         {
+    //             if(hasAframe)
+    //             {
+    //                 break;
+    //             }
+
+    //             int j = 0;
+    //             if (i == currentPacketStart)
+    //             {
+    //                 /* code */
+    //                 j = lastBlockEnd;
+    //             }
+    //             else
+    //             {
+    //                 j = 0;
+    //             }
+    //             for (; j < BLOCKS_PER_PACKET; ++j)
+    //             {
+    //                 /* code */
+    //                 if(lastAzumith == -1)
+    //                 {
+    //                     lastAzumith = bufferPacket[i].blocks[j].azimuth;
+    //                     continue;
+    //                 }
+
+
+    //                 if(lastAzumith > bufferPacket[i].blocks[j].azimuth)
+    //                 {
+    //                     currentBlockEnd = j;
+    //                     hasAframe = 1;
+    //                     currentPacketEnd = i;
+    //                     break;
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     if(hasAframe)
+    //     {
+    //         for(int i = 0 ; i < LASER_COUNT ; i++)
+    //         {
+    //             if(PandarEnableList[i] == 1)
+    //             {
+    //                 int j = 0;
+    //                 for (int k = 0; k < (currentPacketEnd + 1); ++k)
+    //                 {
+    //                     if(k == 0)
+    //                         j = lastBlockEnd;
+    //                     else
+    //                         j = 0;
+
+    //                     for (; j < BLOCKS_PER_PACKET; ++j)
+    //                     {
+    //                         /* code */
+    //                         if (currentBlockEnd == j && k == (currentPacketEnd))
+    //                         {
+    //                             break;
+    //                         }
+    //                         toPointClouds(&bufferPacket[k] , i , j, time_corrections[k], pc);
+
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         memcpy(&bufferPacket[0] , &bufferPacket[currentPacketEnd] , sizeof(raw_packet_t) * (bufferPacketSize - currentPacketEnd));
+    //         bufferPacketSize = bufferPacketSize - currentPacketEnd;
+    //         lastBlockEnd = currentBlockEnd;
+
+    //         // for(int i = 0 ; i < LASER_COUNT ; i++)
+    //         // {
+    //         //     if(PandarEnableList[i] == 1)
+    //         //     {
+    //         //         pc.height++;
+    //         //     }
+    //         // }
+
+    //         // pc.width /= pc.height;
+    //         // if(pc.width > 1900 || pc.width < 1700)
+    //         // {
+    //         //     ROS_INFO("This fram ");
+    //         // }
+
+    //         return 1;
+    //     }
+    //     else
+    //     {
+    //         return 0;
+    //     }
+    // }
+    
+
     int RawData::unpack(const pandar_msgs::PandarScan &scanMsg, pcl::PointCloud<PointXYZData> &pc)
     {
-
-        currentPacketStart = bufferPacketSize == 0 ? 0 :bufferPacketSize -1;
-        std::vector<float> time_corrections;
         for (int i = 0; i < scanMsg.packets.size(); ++i)
         {
-            /* code */
-            parseRawData(&bufferPacket[bufferPacketSize++], &scanMsg.packets[i].data[0], scanMsg.packets[i].data.size());
-
             // calculate time correction
             float time_correction_in_msg = float(i)/float(scanMsg.packets.size());
-            time_corrections.push_back(time_correction_in_msg);
+            raw_packet_t packet;
+            parseRawData(&packet, &scanMsg.packets[i].data[0], scanMsg.packets[i].data.size());
+            toPointClouds(&packet, time_correction_in_msg, pc);
         }
-
-        // ROS_ERROR("currentPacketStart %d bufferPacketSize %d " , currentPacketStart , bufferPacketSize);
-        int hasAframe = 0;
-        int currentBlockEnd = 0;
-        int currentPacketEnd = 0;
-        if(bufferPacketSize > 1)
-        {
-            int lastAzumith = -1;
-            for(int i = currentPacketStart ; i < bufferPacketSize ; i++)
-            {
-                if(hasAframe)
-                {
-                    break;
-                }
-
-                int j = 0;
-                if (i == currentPacketStart)
-                {
-                    /* code */
-                    j = lastBlockEnd;
-                }
-                else
-                {
-                    j = 0;
-                }
-                for (; j < BLOCKS_PER_PACKET; ++j)
-                {
-                    /* code */
-                    if(lastAzumith == -1)
-                    {
-                        lastAzumith = bufferPacket[i].blocks[j].azimuth;
-                        continue;
-                    }
-
-
-                    if(lastAzumith > bufferPacket[i].blocks[j].azimuth)
-                    {
-                        currentBlockEnd = j;
-                        hasAframe = 1;
-                        currentPacketEnd = i;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if(hasAframe)
-        {
-            for(int i = 0 ; i < LASER_COUNT ; i++)
-            {
-                if(PandarEnableList[i] == 1)
-                {
-                    int j = 0;
-                    for (int k = 0; k < (currentPacketEnd + 1); ++k)
-                    {
-                        if(k == 0)
-                            j = lastBlockEnd;
-                        else
-                            j = 0;
-
-                        for (; j < BLOCKS_PER_PACKET; ++j)
-                        {
-                            /* code */
-                            if (currentBlockEnd == j && k == (currentPacketEnd))
-                            {
-                                break;
-                            }
-                            toPointClouds(&bufferPacket[k] , i , j, time_corrections[k], pc);
-
-                        }
-                    }
-                }
-            }
-
-            memcpy(&bufferPacket[0] , &bufferPacket[currentPacketEnd] , sizeof(raw_packet_t) * (bufferPacketSize - currentPacketEnd));
-            bufferPacketSize = bufferPacketSize - currentPacketEnd;
-            lastBlockEnd = currentBlockEnd;
-
-            // for(int i = 0 ; i < LASER_COUNT ; i++)
-            // {
-            //     if(PandarEnableList[i] == 1)
-            //     {
-            //         pc.height++;
-            //     }
-            // }
-
-            // pc.width /= pc.height;
-            // if(pc.width > 1900 || pc.width < 1700)
-            // {
-            //     ROS_INFO("This fram ");
-            // }
-
-            return 1;
-        }
-        else
-        {
-            return 0;
-        }
-
-
-#if 0
-        raw_packet_t *packets = new raw_packet_t[scanMsg->packets.size()];
-
-    int lastAzumith = -1;
-    int currentPacketEnd = 0;
-    int currentBlockEnd = 0;
-    raw_packet_t *currentPacket = NULL;
-
-    int currentAvariableBlock = 0;
-
-    int foundTheGap = 0;
-    // process each packet provided by the driver
-    for (size_t i = 0; i < scanMsg->packets.size(); ++i)
-    {
-
-        parseRawData(&packets[i], &scanMsg->packets[i].data[0], scanMsg->packets[i].data.size());
-
-        if(foundTheGap)
-            continue;
-
-        for(size_t j = 0 ; j < BLOCKS_PER_PACKET ; j++)
-        {
-            if(lastAzumith == -1)
-            {
-                lastAzumith = packets[i].blocks[j].azimuth;
-                continue;
-            }
-
-            if(lastAzumith > packets[i].blocks[j].azimuth)
-            {
-                // a frame;
-                if(i != (scanMsg->packets.size() - 1))
-                {
-                    if(j ==  (BLOCKS_PER_PACKET-1))
-                    {
-                        currentPacketEnd = i+1;
-                        currentBlockEnd = 0;
-                    }
-                    else
-                    {
-                        currentPacketEnd = i;
-                        currentBlockEnd = j+1;
-                    }
-
-                    currentPacket = packets;
-                }
-                else
-                {
-                    if(j ==  (BLOCKS_PER_PACKET-1))
-                    {
-                        currentPacket = NULL;
-                        currentPacketEnd = 0;
-                        currentBlockEnd = 0;
-                    }
-                    else
-                    {
-                        currentPacketEnd = i;
-                        currentBlockEnd = j+1;
-                        currentPacket = packets;
-                    }
-                }
-                foundTheGap = 1;
-                break;
-            }
-
-            currentAvariableBlock++;
-        }
-    }
-
-    // ROS_ERROR("dddd  %d %d " , currentPacketEnd , currentBlockEnd);
-#if 1
-    if(lastPacket)
-    {
-        int first = 1;
-        int j = 0;
-
-        for(int i = 0 ; i < LASER_COUNT ; i++)
-        {
-            if(PandarEnableList[i] == 1)
-            {
-                for (int k = lastPacketEnd; k < lastPacketCounter; ++k)
-                {
-                    if(k == lastPacketEnd)
-                        j = lastBlockEnd;
-                    else
-                        j = 0;
-
-                    for (; j < BLOCKS_PER_PACKET; ++j)
-                    {
-                        /* code */
-                        toPointClouds(&lastPacket[k] , i , j, pc);
-                        pc.width++;
-                    }
-                }
-            }
-        }
-    }
-#endif
-
-    // // if(lastPacket && packets[0].blocks[0].azimuth < lastPacket[lastPacketCounter-1].blocks[BLOCKS_PER_PACKET -1].azimuth)
-    // // {
-    // // }
-    // else
-    {
-        for(int i = 0 ; i < LASER_COUNT ; i++)
-        {
-            if(PandarEnableList[i] != 1)
-            {
-                continue;
-            }
-            for (int k = 0; k <= currentPacketEnd; ++k)
-            {
-                for (int j = 0; j < BLOCKS_PER_PACKET; ++j)
-                {
-                    if(k == currentPacketEnd && j == currentBlockEnd)
-                        break;
-                    /* code */
-                    toPointClouds(&packets[k] , i , j, pc);
-                    pc.width++;
-                }
-
-            }
-        }
-    }
-
-
-#if 1
-
-    for(int i = 0 ; i < LASER_COUNT ; i++)
-    {
-        if(PandarEnableList[i] == 1)
-        {
-            pc.height++;
-        }
-    }
-
-    pc.width /= pc.height;
-    if(pc.width > 1900 || pc.width < 1700)
-    {
-        ROS_ERROR("SSS %d %d  , %d %d " , currentPacketEnd , currentBlockEnd , lastPacketEnd ,lastBlockEnd);
-    }
-
-    if(lastPacket)
-    {
-        delete [] lastPacket;
-        lastPacket = NULL;
-    }
-
-    if(currentPacket)
-    {
-        lastPacket = currentPacket;
-        lastPacketEnd = currentPacketEnd;
-        lastBlockEnd = currentBlockEnd;
-        lastPacketCounter = scanMsg->packets.size();
-    }
-
-#else
-    lastPacket = NULL;
-    delete [] packets;
-#endif
-#endif
+        return 1;
     }
 
 /** @brief convert raw packet to point cloud
